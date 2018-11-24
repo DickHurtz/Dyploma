@@ -1,0 +1,202 @@
+
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>phaser</title>
+        <script src="phaser.js"></script>
+        <script src="phaser.min.js"></script>
+    </head>
+    <body>
+    <script type="text/javascript">
+    window.onload = function() {
+    var game = new Phaser.Game(800, 600, Phaser.CANVAS, 'phaser-example', { preload: preload, create: create, update: update});
+
+    function preload() {
+        game.stage.backgroundColor = "#BB440D";
+        game.load.image('bullet', 'assets/sprites/shoots.png', 5, 5);
+        game.load.tilemap('map', 'assets/tilemaps/csv/testmap1.csv', null, Phaser.Tilemap.CSV);
+        game.load.image('tiles', 'assets/tilemaps/tiles/wires.png');
+        game.load.spritesheet('player', 'assets/sprites/ultramarine.png', 85, 70);
+        game.load.spritesheet('zombie', 'assets/sprites/zombiefied.png', 60, 60);
+    }
+
+    var map;
+    var zombies; 
+    var layer;
+    var cursors;
+    var player;
+    var bullets;
+    var fireRate = 100;
+    var nextFire = 0;
+    var playerscore = 0;
+    var score;
+    var playerbites = 5;
+    var bites;
+
+    function create() {
+        game.physics.startSystem(Phaser.Physics.ARCADE);
+
+        map = game.add.tilemap('map', 60, 60);
+
+        map.addTilesetImage('tiles');
+        bullets = game.add.group();
+        bullets.enableBody = true;
+        bullets.physicsBodyType = Phaser.Physics.ARCADE;
+
+        CreatePlayer();
+
+        bullets.createMultiple(50, 'bullet');
+        bullets.setAll('checkWorldBounds', true);
+        bullets.setAll('outOfBoundsKill', true);
+        
+        layer = map.createLayer(0);
+
+        layer.resizeWorld();
+        
+        map.setCollisionBetween(0, 1);
+
+        bullets.enableBody = true;
+
+        cursors = game.input.keyboard.createCursorKeys();
+
+        var help = game.add.text(16, 16, 'Arrows to move\n Left click to shoot\n (gun shoot attractes horde)', { font: '14px Arial', fill: '#ffffff', align: 'center'});
+        help.fixedToCamera = true;
+
+        score = game.add.text(400, 16, 'You killed ' + playerscore + ' zombies', { font: '14px Arial', fill: '#ffffff' });
+        score.fixedToCamera = true;
+
+        bites = game.add.text(600, 16, 'Bites you can handle - ' + playerbites, { font: '14px Arial', fill: '#ffffff' });
+        bites.fixedToCamera = true;
+
+        zombies = game.add.group();
+        zombies.enableBody = true;
+    }
+
+    function CreatePlayer(){
+        player = game.add.sprite(game.world.centerX, game.world.centerY, 'player', 1);
+        player.animations.add('still', [0,1,2,3,4,5], 10, true);
+        player.animations.add('right', [6,7,8,9,10,11,12,13,14], 10, true);
+        player.animations.add('left', [15,16,17,18,19,20,21,22,23], 10, true);
+
+        game.physics.enable(player, Phaser.Physics.ARCADE);
+
+        player.body.setSize(10, 14, 2, 1);
+
+        game.camera.follow(player);
+    };
+
+    function createzombies () {
+    
+    for (var x = 0; x < 1; x++)
+        {
+            var zombie = zombies.create(game.world.randomX, game.world.randomY, 'zombie');
+            zombie.animations.add('walk-right', [0,1,2,3,4,5,6,7], 10, true);
+            zombie.animations.add('walk-left', [8,9,10,11,12,13,14,15], 10, true);
+            zombie.anchor.setTo(0.5, 0.5);
+            zombie.body.moves = true;
+            zombie.body.velocity.setTo(0);
+            game.physics.arcade.moveToObject(zombie, player, 100, false);
+            if(player.x > zombie.x){
+                zombie.play('walk-right');
+            }
+            else if(player.x < zombie.x){
+                zombie.play('walk-left');
+            }
+        }
+    }
+
+    function collisionHandler (bullet, zombie) {
+        bullet.kill();
+        zombie.kill();
+        playerscore++;
+        score.setText('You killed ' + playerscore + ' zombies');
+    }
+
+    function lifeHandler(player, zombie){
+        zombie.kill();
+        playerscore++;
+        playerbites--;
+        bites.setText('Bites you can handle - ' + playerbites);
+        if (playerbites < 1) {
+            player.kill();
+            game.paused = true;
+            dead = game.add.text(400, 500, '- YOU ARE ZOMBIEFIED NOW! -\n(left click to restart)', { font: "32px Arial", fill: "#FFF", align: "center"})
+            dead.fixedToCamera = true;
+            dead.anchor.set(0.5);
+            game.stage.setBackgroundColor(0x2d2d2d);
+            game.input.onTap.addOnce(restart);
+        }
+
+    function restart() {
+            game.paused = false;
+            zombies.callAll('kill');
+            bullets.callAll('kill');
+            CreatePlayer();
+            playerscore = 0;
+            score.setText('You killed ' + playerscore + ' zombies');
+            playerbites = 5;
+            bites.setText('Bites you can handle - ' + playerbites);
+            dead.destroy();
+            game.stage.setBackgroundColor(0xBB440D);
+        };
+    }
+
+
+
+    function update() {
+        game.physics.arcade.enable(player);
+        game.physics.arcade.overlap(bullets, zombies, collisionHandler, null, this);
+        game.physics.arcade.overlap(player, zombies, lifeHandler, null, this);
+        game.physics.arcade.collide(player, layer);
+        game.physics.arcade.collide(zombies, layer);
+        player.body.velocity.set(0);
+        var x = game.rnd.integerInRange(1, 100);
+        if (game.input.mousePointer.isDown && x > 80){
+            createzombies(); 
+        }
+
+        if (cursors.left.isDown)
+        {
+            player.body.velocity.x = -100;
+            player.play('left');
+        }
+        else if (cursors.right.isDown)
+        {
+            player.body.velocity.x = 100;
+            player.play('right');
+        }
+        else if (cursors.up.isDown)
+        {
+            player.body.velocity.y = -100;
+            player.play('left');
+        }
+        else if (cursors.down.isDown)
+        {
+            player.body.velocity.y = 100;
+            player.play('right');
+        }
+        else
+        {
+            player.play('still');
+        }
+
+        if (game.input.mousePointer.isDown)
+        {
+            fire();
+        }
+    }
+
+    function fire() {
+        if (game.time.now > nextFire && bullets.countDead() > 0)
+            {
+                nextFire = game.time.now + fireRate;
+                var bullet = bullets.getFirstDead();
+                bullet.reset(player.x + 45, player.y + 29);
+                game.physics.arcade.moveToPointer(bullet, 300);
+            }
+        }
+    };
+    </script>
+    </body>
+</html>
